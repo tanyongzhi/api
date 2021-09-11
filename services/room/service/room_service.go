@@ -1,63 +1,67 @@
 package service
 
 import (
-	"errors"
-	"net/http"
-
-	"github.com/HackIllinois/api/common/apirequest"
-	"github.com/HackIllinois/api/services/stat/config"
-	"github.com/HackIllinois/api/services/stat/models"
+	"github.com/HackIllinois/api/common/database"
+	"github.com/HackIllinois/api/services/room/config"
+	"github.com/HackIllinois/api/services/room/models"
 )
 
+var db database.Database
+
+const OCCUPANCY_COLLECTION string = "occupancy"
+
+/*
+	Initialize DB connections
+*/
 func Initialize() error {
+	if db != nil {
+		db.Close()
+		db = nil
+	}
+
+	var err error
+	db, err = database.InitDatabase(config.ROOM_DB_HOST, config.ROOM_DB_NAME)
+
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 /*
-	Retrieve stats from the specified service
+	Fetches the occupancy value corresponding to the roomId
 */
-func GetAggregatedStats(service string) (*models.Stat, error) {
-
-
-/*
-	Attempts to retrieve stats from the specified service and outputs this
-	information to the given channel
-*/
-func GetAggregatedStatsAsync(service string, stat_chan chan models.AsyncStat) {
-	stat, err := GetAggregatedStats(service)
-	stat_chan <- models.AsyncStat{
-		Service: service,
-		Stat:    stat,
-		Error:   err,
+func GetRoomOccupancyById(roomId string) (models.RoomOccupancy, error) {
+	query := database.QuerySelector{
+		"roomId": roomId,
 	}
+
+	var occupancy models.RoomOccupancy
+	err := db.FindOne(OCCUPANCY_COLLECTION, query, &occupancy)
+
+	return occupancy, err
 }
 
 /*
-	Retreives stats from all services
-	Returns a map of service name to stats
+	Fetches occupancy values corresponding to all roomIDs
 */
-func GetAllAggregatedStats() (*models.AggregatedStat, error) {
-	stats := models.AggregatedStat{}
+func GetAllRoomOccupancy() (models.RoomOccupancy, error) {
+	query := database.QuerySelector{}
 
-	stat_chan := make(chan models.AsyncStat)
+	var occupancy models.RoomOccupancy
+	err := db.FindOne(OCCUPANCY_COLLECTION, query, &occupancy)
 
-	for service := range config.STAT_ENDPOINTS {
-		go GetAggregatedStatsAsync(service, stat_chan)
-	}
+	return occupancy, err
+}
 
-	for i := 0; i < len(config.STAT_ENDPOINTS); i++ {
-		async_stat := <-stat_chan
+/*
+	Writes the new occupancy value corresponding to the respective roomId to the database.
 
-		service := async_stat.Service
-		stat := async_stat.Stat
-		err := async_stat.Error
-
-		if err == nil {
-			stats[service] = *stat
-		} else {
-			stats[service] = nil
-		}
-	}
-
-	return &stats, nil
+	NOTE: This function does NOT perform any checks regarding the validity of the new occupancy value. Ensure
+	that the caller of this function performs all the necessary checks (eg. if negative capacity has been reached)
+	before calling this function.
+*/
+func UpdateRoomOccupancy(roomId int, newOccupancyVal int) error {
+	return nil
 }

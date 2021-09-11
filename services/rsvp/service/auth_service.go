@@ -2,10 +2,11 @@ package service
 
 import (
 	"errors"
+	"net/http"
+
 	"github.com/HackIllinois/api/common/apirequest"
 	"github.com/HackIllinois/api/services/rsvp/config"
 	"github.com/HackIllinois/api/services/rsvp/models"
-	"net/http"
 )
 
 /*

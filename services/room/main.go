@@ -6,6 +6,7 @@ import (
 	"github.com/HackIllinois/api/common/apiserver"
 	"github.com/HackIllinois/api/services/room/config"
 	"github.com/HackIllinois/api/services/room/controller"
+	"github.com/HackIllinois/api/services/room/service"
 	"github.com/gorilla/mux"
 )
 
@@ -14,10 +15,9 @@ func Initialize() error {
 
 	if err != nil {
 		return err
-
 	}
 
-	// err = service.Initialize()
+	err = service.Initialize()
 
 	if err != nil {
 		return err

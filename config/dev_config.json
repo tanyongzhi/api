@@ -43,6 +43,7 @@
 	"NOTIFICATIONS_DB_HOST": "localhost",
 	"PROJECT_DB_HOST": "localhost",
 	"PROFILE_DB_HOST": "localhost",
+	"ROOM_DB_HOST": "localhost",
 
 	"AUTH_DB_NAME": "auth",
 	"USER_DB_NAME": "user",
@@ -57,6 +58,7 @@
 	"NOTIFICATIONS_DB_NAME": "notifications",
 	"PROJECT_DB_NAME": "project",
 	"PROFILE_DB_NAME": "profile",
+	"ROOM_DB_NAME": "room",
 
 	"S3_REGION": "us-east-1",
 	"S3_BUCKET": "hackillinois-upload-2019",

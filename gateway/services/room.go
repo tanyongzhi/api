@@ -29,7 +29,7 @@ var RoomRoutes = arbor.RouteCollection{
 }
 
 func UpdateRoomOccupancy(w http.ResponseWriter, r *http.Request) {
-	arbor.GET(w, config.ROOM_SERVICE+r.URL.String(), InfoFormat, "", r)
+	arbor.POST(w, config.ROOM_SERVICE+r.URL.String(), InfoFormat, "", r)
 }
 
 func GetRoomOccupancyById(w http.ResponseWriter, r *http.Request) {
