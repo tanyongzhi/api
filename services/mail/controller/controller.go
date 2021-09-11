@@ -2,11 +2,12 @@ package controller
 
 import (
 	"encoding/json"
+	"net/http"
+
 	"github.com/HackIllinois/api/common/errors"
 	"github.com/HackIllinois/api/services/mail/models"
 	"github.com/HackIllinois/api/services/mail/service"
 	"github.com/gorilla/mux"
-	"net/http"
 )
 
 func SetupController(route *mux.Route) {

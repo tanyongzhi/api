@@ -1,8 +1,9 @@
 package config
 
 import (
-	"github.com/HackIllinois/api/common/configloader"
 	"os"
+
+	"github.com/HackIllinois/api/common/configloader"
 )
 
 var IS_PRODUCTION bool
