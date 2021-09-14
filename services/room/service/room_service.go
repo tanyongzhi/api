@@ -32,9 +32,9 @@ func Initialize() error {
 /*
 	Fetches the occupancy value corresponding to the roomId
 */
-func GetRoomOccupancyById(roomId string) (models.RoomOccupancy, error) {
+func GetRoomOccupancyById(room_id string) (models.RoomOccupancy, error) {
 	query := database.QuerySelector{
-		"roomId": roomId,
+		"roomId": room_id,
 	}
 
 	var occupancy models.RoomOccupancy
@@ -62,6 +62,16 @@ func GetAllRoomOccupancy() (models.RoomOccupancy, error) {
 	that the caller of this function performs all the necessary checks (eg. if negative capacity has been reached)
 	before calling this function.
 */
-func UpdateRoomOccupancy(roomId int, newOccupancyVal int) error {
-	return nil
+func UpdateRoomOccupancy(room_id string, new_remaining_spaces int, max_capacity int) error {
+	selector := database.QuerySelector{
+		"roomId": room_id,
+	}
+
+	err := db.Update(OCCUPANCY_COLLECTION, selector, &models.RoomOccupancy{
+		RoomID:          room_id,
+		RemainingSpaces: new_remaining_spaces,
+		MaxCapacity:     max_capacity,
+	})
+
+	return err
 }
