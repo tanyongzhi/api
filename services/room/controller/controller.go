@@ -4,21 +4,50 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/HackIllinois/api/common/database"
 	"github.com/HackIllinois/api/common/errors"
 	"github.com/HackIllinois/api/services/room/models"
 	"github.com/HackIllinois/api/services/room/service"
 	"github.com/gorilla/mux"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+)
+
+var (
+	remaining_spaces_metrics = *promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "room_remaining_spaces",
+		Help: "Number of remaining spaces for each room",
+	}, []string{"roomID"})
 )
 
 func SetupController(route *mux.Route) {
-	router := route.Subrouter()
+	emitOccupancyCounts()
 
+	router := route.Subrouter()
 	router.HandleFunc("/update/", UpdateRoomOccupancy).Methods("POST")
 	router.HandleFunc("/occupancy/{id}/", GetRoomOccupancyById).Methods("GET")
 	router.HandleFunc("/occupancy/", GetAllRoomOccupancy).Methods("GET")
+	router.Handle("/graph", promhttp.Handler()).Methods("GET")
 
+}
+
+func emitOccupancyCounts() {
+	QUERY_TIME := 2 * time.Second
+	go func() {
+		for {
+			db_resp, err := service.GetAllRoomOccupancy()
+			if err == nil {
+				for _, room := range db_resp {
+					remaining_spaces_metrics.WithLabelValues(room.RoomID).Set(float64(room.RemainingSpaces))
+				}
+			}
+
+			time.Sleep(QUERY_TIME)
+		}
+	}()
 }
 
 /*
@@ -43,16 +72,10 @@ func UpdateRoomOccupancy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// validity checks
-	remaining_spaces := db_resp.RemainingSpaces
-	new_remaining_spaces := remaining_spaces - room_modification.NumPeople
-	if new_remaining_spaces < 0 {
-		msg := fmt.Sprintf("Invalid operation: only %v remaining spaces left", remaining_spaces)
-		errors.WriteError(w, r, errors.ApiError{Status: http.StatusForbidden, Type: "INVALID_OPERATION", Message: msg, RawError: msg})
-		return
-	}
-	if new_remaining_spaces > db_resp.MaxCapacity {
-		msg := fmt.Sprintf("Invalid operation: the max capacity of room %v is %v", room_id, db_resp.MaxCapacity)
-		errors.WriteError(w, r, errors.ApiError{Status: http.StatusForbidden, Type: "INVALID_OPERATION", Message: msg, RawError: msg})
+	new_remaining_spaces := db_resp.RemainingSpaces - room_modification.NumPeople
+	error_msg, is_valid := checkRoomSpaceValid(db_resp, new_remaining_spaces)
+	if !is_valid {
+		errors.WriteError(w, r, errors.ApiError{Status: http.StatusForbidden, Type: "INVALID_OPERATION", Message: error_msg, RawError: error_msg})
 		return
 	}
 
@@ -72,6 +95,26 @@ func UpdateRoomOccupancy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	json.NewEncoder(w).Encode(db_resp)
+}
+
+/*
+	Validity checks on the remaining spaces in a room
+
+	Returns (err msg, validity check success/fail result)
+*/
+func checkRoomSpaceValid(db_resp models.RoomOccupancy, new_remaining_spaces int) (string, bool) {
+	var msg string = ""
+
+	if new_remaining_spaces < 0 {
+		msg = fmt.Sprintf("Invalid operation: only %v remaining spaces left", db_resp.RemainingSpaces)
+		return msg, false
+	}
+	if new_remaining_spaces > db_resp.MaxCapacity {
+		msg = fmt.Sprintf("Invalid operation: the max capacity of room %v is %v", db_resp.RoomID, db_resp.MaxCapacity)
+		return msg, false
+	}
+
+	return msg, true
 }
 
 /*

@@ -46,11 +46,11 @@ func GetRoomOccupancyById(room_id string) (models.RoomOccupancy, error) {
 /*
 	Fetches occupancy values corresponding to all roomIDs
 */
-func GetAllRoomOccupancy() (models.RoomOccupancy, error) {
+func GetAllRoomOccupancy() ([]models.RoomOccupancy, error) {
 	query := database.QuerySelector{}
 
-	var occupancy models.RoomOccupancy
-	err := db.FindOne(OCCUPANCY_COLLECTION, query, &occupancy)
+	var occupancy []models.RoomOccupancy
+	err := db.FindAll(OCCUPANCY_COLLECTION, query, &occupancy)
 
 	return occupancy, err
 }
