@@ -2,7 +2,6 @@ package controller
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -63,24 +62,9 @@ func UpdateRoomOccupancy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// retrieve pertinent record from db
-	db_resp, err := service.GetRoomOccupancyById(room_id)
-	if err != nil {
-		message, http_err_type, http_status_code := generateDbHttpErr(err)
-		errors.WriteError(w, r, errors.ApiError{Status: http_status_code, Type: http_err_type, Message: message, RawError: err.Error()})
-		return
-	}
-
-	// validity checks
-	new_remaining_spaces := db_resp.RemainingSpaces - room_modification.NumPeople
-	error_msg, is_valid := checkRoomSpaceValid(db_resp, new_remaining_spaces)
-	if !is_valid {
-		errors.WriteError(w, r, errors.ApiError{Status: http.StatusForbidden, Type: "INVALID_OPERATION", Message: error_msg, RawError: error_msg})
-		return
-	}
-
-	// checks are ok, write to db now
-	err = service.UpdateRoomOccupancy(room_id, new_remaining_spaces, db_resp.MaxCapacity)
+	// validate and write to db
+	change_in_remaining_spaces := room_modification.NumPeople
+	err := service.UpdateRoomOccupancy(room_id, change_in_remaining_spaces)
 	if err != nil {
 		message, http_err_type, http_status_code := generateDbHttpErr(err)
 		errors.WriteError(w, r, errors.ApiError{Status: http_status_code, Type: http_err_type, Message: message, RawError: err.Error()})
@@ -88,33 +72,13 @@ func UpdateRoomOccupancy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// final read, then return
-	db_resp, err = service.GetRoomOccupancyById(room_id)
+	db_resp, err := service.GetRoomOccupancyById(room_id)
 	if err != nil {
 		message, http_err_type, http_status_code := generateDbHttpErr(err)
 		errors.WriteError(w, r, errors.ApiError{Status: http_status_code, Type: http_err_type, Message: message, RawError: err.Error()})
 		return
 	}
 	json.NewEncoder(w).Encode(db_resp)
-}
-
-/*
-	Validity checks on the remaining spaces in a room
-
-	Returns (err msg, validity check success/fail result)
-*/
-func checkRoomSpaceValid(db_resp models.RoomOccupancy, new_remaining_spaces int) (string, bool) {
-	var msg string = ""
-
-	if new_remaining_spaces < 0 {
-		msg = fmt.Sprintf("Invalid operation: only %v remaining spaces left", db_resp.RemainingSpaces)
-		return msg, false
-	}
-	if new_remaining_spaces > db_resp.MaxCapacity {
-		msg = fmt.Sprintf("Invalid operation: the max capacity of room %v is %v", db_resp.RoomID, db_resp.MaxCapacity)
-		return msg, false
-	}
-
-	return msg, true
 }
 
 /*
@@ -164,6 +128,16 @@ func generateDbHttpErr(err error) (string, string, int) {
 	var message, http_err_type string
 	var http_status_code int
 
+	// handles validation errors
+	switch err.(type) {
+	case *service.ErrExceedRemainingSpaces, *service.ErrNegativeRemainingSpaces:
+		message, http_err_type = err.Error(), err.Error()
+		http_status_code = http.StatusForbidden
+
+		return message, http_err_type, http_status_code
+	}
+
+	// handles db errors
 	switch err {
 	case database.ErrNotFound:
 		message, http_err_type = "Room ID does not exist", "NOT_FOUND"

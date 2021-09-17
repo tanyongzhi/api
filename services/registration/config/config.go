@@ -1,9 +1,10 @@
 package config
 
 import (
+	"os"
+
 	"github.com/HackIllinois/api/common/configloader"
 	"github.com/HackIllinois/api/common/datastore"
-	"os"
 )
 
 var REGISTRATION_DB_HOST string
