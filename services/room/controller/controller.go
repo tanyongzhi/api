@@ -22,14 +22,32 @@ var (
 	}, []string{"roomID"})
 )
 
+var totalRequests = *promauto.NewCounterVec(
+	prometheus.CounterOpts{
+		Name: "http_requests_total",
+		Help: "Number of get requests.",
+	},
+	[]string{"path"},
+)
+
+func httpCountMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, r)
+
+		totalRequests.WithLabelValues(r.URL.Path).Inc()
+	})
+}
+
 func SetupController(route *mux.Route) {
 	emitOccupancyCounts()
 
 	router := route.Subrouter()
+	router.Use(httpCountMiddleware)
+
 	router.HandleFunc("/update/", UpdateRoomOccupancy).Methods("POST")
 	router.HandleFunc("/occupancy/{id}/", GetRoomOccupancyById).Methods("GET")
 	router.HandleFunc("/occupancy/", GetAllRoomOccupancy).Methods("GET")
-	router.Handle("/graph", promhttp.Handler()).Methods("GET")
+	router.Handle("/graph/", promhttp.Handler()).Methods("GET")
 
 }
 

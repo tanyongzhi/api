@@ -34,6 +34,7 @@ func Entry() {
 	}
 
 	router := mux.NewRouter()
+
 	controller.SetupController(router.PathPrefix("/room"))
 
 	log.Fatal(apiserver.StartServer(config.ROOM_PORT, router, "room", Initialize))
