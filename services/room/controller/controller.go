@@ -7,6 +7,7 @@ import (
 
 	"github.com/HackIllinois/api/common/database"
 	"github.com/HackIllinois/api/common/errors"
+	"github.com/HackIllinois/api/services/room/metrics"
 	"github.com/HackIllinois/api/services/room/models"
 	"github.com/HackIllinois/api/services/room/service"
 	"github.com/gorilla/mux"
@@ -22,33 +23,35 @@ var (
 	}, []string{"roomID"})
 )
 
-var totalRequests = *promauto.NewCounterVec(
-	prometheus.CounterOpts{
-		Name: "http_requests_total",
-		Help: "Number of get requests.",
-	},
-	[]string{"path"},
-)
+var router *mux.Router
 
-func httpCountMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		next.ServeHTTP(w, r)
+func metricsWrapper(next http.Handler, endpoint string) http.Handler {
+	labels := map[string]string{
+		"endpoint": endpoint,
+	}
+	return promhttp.InstrumentHandlerDuration(metrics.Duration.MustCurryWith(labels),
+		promhttp.InstrumentHandlerCounter(metrics.TotalRequests.MustCurryWith(labels),
+			next))
+}
 
-		totalRequests.WithLabelValues(r.URL.Path).Inc()
-	})
+// register handlers and metrics
+func registerHandler(endpoint string, f func(http.ResponseWriter, *http.Request), method string) {
+	chain := metricsWrapper(http.HandlerFunc(f), endpoint)
+	router.Handle(endpoint, chain).Methods(method)
 }
 
 func SetupController(route *mux.Route) {
 	emitOccupancyCounts()
 
-	router := route.Subrouter()
-	router.Use(httpCountMiddleware)
+	router = route.Subrouter()
 
-	router.HandleFunc("/update/", UpdateRoomOccupancy).Methods("POST")
-	router.HandleFunc("/occupancy/{id}/", GetRoomOccupancyById).Methods("GET")
-	router.HandleFunc("/occupancy/", GetAllRoomOccupancy).Methods("GET")
+	// router.HandleFunc("/update/", UpdateRoomOccupancy).Methods("POST")
+	// router.HandleFunc("/occupancy/{id}/", GetRoomOccupancyById).Methods("GET")
+	// router.HandleFunc("/occupancy/", GetAllRoomOccupancy).Methods("GET")
+	registerHandler("/update", UpdateRoomOccupancy, "POST")
+	registerHandler("/occupancy/{id}/", GetRoomOccupancyById, "GET")
+	registerHandler("/occupancy/", GetAllRoomOccupancy, "GET")
 	router.Handle("/graph/", promhttp.Handler()).Methods("GET")
-
 }
 
 func emitOccupancyCounts() {
